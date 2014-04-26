@@ -7,7 +7,7 @@ namespace Zbu.Yol
     /// <summary>
     /// Provides extension methods to the <see cref="Assembly"/> class.
     /// </summary>
-    internal static class AssemblyExtensions
+    public static class AssemblyExtensions
     {
         /// <summary>
         /// Gets the text content of an assembly resource identified by its name.
