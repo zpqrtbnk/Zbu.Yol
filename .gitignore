@@ -1,0 +1,8 @@
+bin
+obj
+pkg
+*.suo
+*.user
+packages
+refs
+*.snk
