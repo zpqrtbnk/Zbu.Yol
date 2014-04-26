@@ -226,7 +226,7 @@ namespace Zbu.Yol
             var verified = new List<string>();
             foreach (var transition in _transitions.Values)
             {
-                if (verified.Contains(transition.SourceState)) continue;
+                if (transition == null || verified.Contains(transition.SourceState)) continue;
 
                 var visited = new List<string> { transition.SourceState };
                 var nextTransition = _transitions[transition.TargetState];
