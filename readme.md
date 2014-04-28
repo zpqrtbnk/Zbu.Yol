@@ -59,9 +59,9 @@ public class ConfigureYolManager : ApplicationEventHandler
             ;
     }
 
-    private static bool DoSomething1(ApplicationContext applicationContext, HttpServerUtility server)
+    private static bool DoSomething1()
     {
-        var svcs = applicationContext.Services;
+        var svcs = ApplicationContext.Current.Services;
 
         var template = new Template("~/Views/SampleTemplate1.cshtml", "Sample Template 1", "SampleTemplate1")
         {
@@ -72,7 +72,7 @@ public class ConfigureYolManager : ApplicationEventHandler
         return true;
     }
 
-	private static bool DoSomething2(ApplicationContext applicationContext, HttpServerUtility server)
+	private static bool DoSomething2()
 	{
 		...
 	}
@@ -98,7 +98,8 @@ A few rules:
 * there should not be loops
 
 A transitionfunction should return `true` to indicate that it has been successful, else `false`. If a transition
-is not successful then the manager will abort and throw.
+is not successful then the manager will abort and throw. Within a transition, you can access ApplicationContext.Current and
+UmbracoContext.Current.
 
 If the manager starts and finds out the site is in a state which is neither the start state of a
 transition, nor the target state of a transition (that would be the final state), it aborts and throws.

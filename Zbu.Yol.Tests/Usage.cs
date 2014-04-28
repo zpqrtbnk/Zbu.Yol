@@ -2,6 +2,7 @@
 using System.Web;
 using Umbraco.Core;
 using Umbraco.Core.Models;
+using Umbraco.Web;
 
 namespace Zbu.Yol.Tests
 {
@@ -22,9 +23,10 @@ namespace Zbu.Yol.Tests
                 ;
         }
 
-        private static bool DoSomething(ApplicationContext applicationContext, HttpServerUtility server)
+        private static bool DoSomething()
         {
-            var svcs = applicationContext.Services;
+            var svcs = ApplicationContext.Current.Services;
+            var server = UmbracoContext.Current.HttpContext.Server;
 
             var template = new Template("~/Views/SampleTemplate1.cshtml", "Sample Template 1", "SampleTemplate1")
             {

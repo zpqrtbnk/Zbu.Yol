@@ -14,8 +14,8 @@ namespace Zbu.Yol.Tests
         public void Simple()
         {
             var mgr = new YolManager();
-            mgr.DefineTransition(string.Empty, "aaa", (appContext, server) => true);
-            mgr.ExecuteInternal(null, null);
+            mgr.DefineTransition(string.Empty, "aaa", () => true);
+            mgr.ExecuteInternal();
             Assert.AreEqual("aaa", mgr.State);
         }
 
@@ -23,10 +23,10 @@ namespace Zbu.Yol.Tests
         public void Multiple()
         {
             var mgr = new YolManager();
-            mgr.DefineTransition(string.Empty, "aaa", (appContext, server) => true);
-            mgr.DefineTransition("aaa", "bbb", (appContext, server) => true);
-            mgr.DefineTransition("bbb", "ccc", (appContext, server) => true);
-            mgr.ExecuteInternal(null, null);
+            mgr.DefineTransition(string.Empty, "aaa", () => true);
+            mgr.DefineTransition("aaa", "bbb", () => true);
+            mgr.DefineTransition("bbb", "ccc", () => true);
+            mgr.ExecuteInternal();
             Assert.AreEqual("ccc", mgr.State);
         }
     }

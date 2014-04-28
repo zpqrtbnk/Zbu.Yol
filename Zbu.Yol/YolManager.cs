@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Web;
 using Umbraco.Core;
 using Umbraco.Core.Logging;
 
@@ -97,7 +96,7 @@ namespace Zbu.Yol
         /// <exception cref="ArgumentNullException"><paramref name="sourceState"/> and/or <paramref name="transition"/> is <c>null</c>.</exception>
         /// <exception cref="ArgumentException"><paramref name="targetState"/> is <c>null</c> or empty, or equal to <paramref name="sourceState"/>.</exception>
         /// <exception cref="InvalidOperationException">A transition from the specified source state already exists.</exception>
-        public YolManager DefineTransition(string sourceState, string targetState, Func<ApplicationContext, HttpServerUtility, bool> transition)
+        public YolManager DefineTransition(string sourceState, string targetState, Func<bool> transition)
         {
             if (sourceState == null)
                 throw new ArgumentNullException("sourceState");
@@ -168,14 +167,14 @@ namespace Zbu.Yol
             // whatever happens when executing transitions.
             using (Security.Impersonate(umbracoApplication, applicationContext, _login))
             {
-                ExecuteInternal(applicationContext, umbracoApplication.Context.Server);
+                ExecuteInternal();
             }
         }
 
         // internal for tests
         // beware, that one does not test for graph inconsistencies, should be done beforehand
         // beware, that one does not validate parameters, should be done beforehand
-        internal void ExecuteInternal(ApplicationContext applicationContext, HttpServerUtility server)
+        internal void ExecuteInternal()
         {
             LogHelper.Info<YolManager>("Starting...");
             var origState = GetState();
@@ -189,7 +188,7 @@ namespace Zbu.Yol
 
             while (transition != null)
             {
-                if (!transition.Execute(applicationContext, server))
+                if (!transition.Execute())
                     throw new Exception("Transition failed.");
 
                 var nextState = transition.TargetState;

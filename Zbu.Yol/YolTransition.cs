@@ -26,6 +26,6 @@ namespace Zbu.Yol
         /// <summary>
         /// Gets or sets the function to execute with the transition.
         /// </summary>
-        public Func<ApplicationContext, HttpServerUtility, bool> Execute { get; internal set; }
+        public Func<bool> Execute { get; internal set; }
     }
 }

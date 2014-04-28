@@ -15,18 +15,18 @@ namespace Zbu.Yol.Tests
         public void CanDefine()
         {
             var mgr = new YolManager();
-            mgr.DefineTransition(string.Empty, "aaa", (appContext, server) => true);
-            mgr.DefineTransition("aaa", "bbb", (appContext, server) => true);
-            mgr.DefineTransition("bbb", "ccc", (appContext, server) => true);
+            mgr.DefineTransition(string.Empty, "aaa", () => true);
+            mgr.DefineTransition("aaa", "bbb", () => true);
+            mgr.DefineTransition("bbb", "ccc", () => true);
         }
 
         [Test]
         public void CannotTransitionToSameState()
         {
             var mgr = new YolManager();
-            Assert.Throws<Exception>(() =>
+            Assert.Throws<ArgumentException>(() =>
             {
-                mgr.DefineTransition("aaa", "aaa", (appContext, server) => true);
+                mgr.DefineTransition("aaa", "aaa", () => true);
             });
         }
 
@@ -34,10 +34,10 @@ namespace Zbu.Yol.Tests
         public void OnlyOneTransitionPerState()
         {
             var mgr = new YolManager();
-            mgr.DefineTransition("aaa", "bbb", (appContext, server) => true);
-            Assert.Throws<Exception>(() =>
+            mgr.DefineTransition("aaa", "bbb", () => true);
+            Assert.Throws<InvalidOperationException>(() =>
             {
-                mgr.DefineTransition("aaa", "ccc", (appContext, server) => true);
+                mgr.DefineTransition("aaa", "ccc", () => true);
             });
         }
 
@@ -45,9 +45,9 @@ namespace Zbu.Yol.Tests
         public void CannotContainTwoMoreHeads()
         {
             var mgr = new YolManager();
-            mgr.DefineTransition(string.Empty, "aaa", (appContext, server) => true);
-            mgr.DefineTransition("aaa", "bbb", (appContext, server) => true);
-            mgr.DefineTransition("ccc", "ddd", (appContext, server) => true);
+            mgr.DefineTransition(string.Empty, "aaa", () => true);
+            mgr.DefineTransition("aaa", "bbb", () => true);
+            mgr.DefineTransition("ccc", "ddd", () => true);
             Assert.Throws<Exception>(mgr.ValidateTransitions);
         }
 
@@ -55,10 +55,10 @@ namespace Zbu.Yol.Tests
         public void CannotContainLoops()
         {
             var mgr = new YolManager();
-            mgr.DefineTransition(string.Empty, "aaa", (appContext, server) => true);
-            mgr.DefineTransition("aaa", "bbb", (appContext, server) => true);
-            mgr.DefineTransition("bbb", "ccc", (appContext, server) => true);
-            mgr.DefineTransition("ccc", "aaa", (appContext, server) => true);
+            mgr.DefineTransition(string.Empty, "aaa", () => true);
+            mgr.DefineTransition("aaa", "bbb", () => true);
+            mgr.DefineTransition("bbb", "ccc", () => true);
+            mgr.DefineTransition("ccc", "aaa", () => true);
             Assert.Throws<Exception>(mgr.ValidateTransitions);
         }
     }
