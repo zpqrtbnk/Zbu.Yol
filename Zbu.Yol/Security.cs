@@ -62,7 +62,8 @@ namespace Zbu.Yol
             var userDataType = typeof(IBootManager).Assembly.GetType("Umbraco.Core.Security.UserData");
             var userData = Activator.CreateInstance(userDataType);
             var props = userDataType.GetProperties();
-            props.Single(x => x.Name == "SessionId").SetValue(userData, Guid.NewGuid().ToString("N"));
+            var name = Umbraco.Core.Configuration.UmbracoVersion.Current.Major >= 7 ? "SessionId" : "UserContextId";
+            props.Single(x => x.Name == name).SetValue(userData, Guid.NewGuid().ToString("N"));
             props.Single(x => x.Name == "Id").SetValue(userData, deployUser.Id);
             props.Single(x => x.Name == "AllowedApplications").SetValue(userData, deployUser.AllowedSections.ToArray());
             props.Single(x => x.Name == "RealName").SetValue(userData, deployUser.Name);
