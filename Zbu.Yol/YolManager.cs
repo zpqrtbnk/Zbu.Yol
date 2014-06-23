@@ -257,7 +257,7 @@ namespace Zbu.Yol
             if (!_nodb)
             {
                 var state = ZbuKeyValueStore.GetValue("Zbu.Yol.Manager." + _name + ".State");
-                if (string.IsNullOrWhiteSpace(state) || !string.IsNullOrWhiteSpace(_statePath))
+                if (string.IsNullOrWhiteSpace(state) && !string.IsNullOrWhiteSpace(_statePath))
                 {
                     try
                     {
