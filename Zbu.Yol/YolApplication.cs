@@ -14,8 +14,10 @@ namespace Zbu.Yol
 
             UmbracoApplicationBase.ApplicationStarted += (sender, args) =>
             {
-                // if YolManager has been initialized then something will happen
+                // ensure we have the key-value store
+                ZbuKeyValueStore.EnsureInstalled(applicationContext);
 
+                // if some YolManager instances have been initialized then something will happen
                 LogHelper.Info<YolApplication>("Run.");
                 YolManager.ExecuteInitialized(umbracoApplication, applicationContext);
             };

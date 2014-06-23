@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.IO;
 using System.Linq;
+using System.Web.Hosting;
 using Umbraco.Core;
 using Umbraco.Core.Logging;
 
@@ -19,72 +21,134 @@ namespace Zbu.Yol
     /// </summary>
     public class YolManager
     {
-        private readonly string _statePath;
+        private readonly bool _nodb;
+        private string _statePath; // temp for compat.
+        private readonly string _name;
         private readonly string _login;
+
         private readonly Dictionary<string, YolTransition> _transitions
             = new Dictionary<string, YolTransition>(StringComparer.InvariantCultureIgnoreCase);
-
-        private static YolManager _current;
+        private static readonly Dictionary<string, YolManager> Managers
+            = new Dictionary<string, YolManager>(StringComparer.InvariantCultureIgnoreCase);
 
         // internal for tests
         internal YolManager()
         {
-            _statePath = null;
+            _nodb = true;
+            _name = null; // default
+            _login = null; // cannot impersonate
             State = string.Empty;
         }
 
-        // the following one is probably never going to be used publically?
-        // keep it internal for the time being.
-        
         /// <summary>
         /// Initializes a new instance of the <see cref="YolManager"/> class with a state file path and a user login.
         /// </summary>
-        /// <param name="statePath">The full path of the file containing the state.</param>
+        /// <param name="name">The name of the manager.</param>
         /// <param name="login">The login of the user to impersonate while running the state machine.</param>
-        /// <exception cref="ArgumentException"><paramref name="statePath"/> and/or <paramref name="login"/> is <c>null</c> or empty.</exception>
-        internal YolManager(string statePath, string login)
+        /// <exception cref="ArgumentException"><paramref name="name"/> and/or <paramref name="login"/> is <c>null</c> or empty.</exception>
+        internal YolManager(string name, string login)
         {
-            if (string.IsNullOrWhiteSpace(statePath))
-                throw new ArgumentException("Cannot be null nor empty.", "statePath");
+            if (string.IsNullOrWhiteSpace(name))
+                throw new ArgumentException("Cannot be null nor empty.", "name");
             if (string.IsNullOrWhiteSpace(login))
                 throw new ArgumentException("Cannot be null nor empty.", "login");
 
-            _statePath = statePath;
+            _name = name;
             _login = login;
         }
+
+        #region State Management
 
         // for tests
         internal string State { get; private set; }
 
         private string GetState()
         {
-            try
-            {
-                if (_statePath == null) return State;
-                return State = (File.Exists(_statePath) ? File.ReadAllText(_statePath) : string.Empty);
-            }
-            catch (Exception e)
-            {
-                throw new Exception("Could not read state because reading the state file failed.", e);
-            }
+            return _nodb ? State : ZbuKeyValueStore.GetValue("Zbu.Yol.Manager." + _name + ".State");
         }
 
         private void SaveState(string origState, string state)
         {
-            var currentState = GetState();
-            if (currentState != origState)
-                throw new Exception("Could not save state because the state in the file has changed.");
-            try
-            {
-                if (_statePath != null)
-                    File.WriteAllText(_statePath, state);
+            if (_nodb)
                 State = state;
-            }
-            catch (Exception e)
-            {                
-                throw new Exception("Could not save state because writing to the state file failed.", e);
+            else
+                ZbuKeyValueStore.SetValue("Zbu.Yol.Manager." + _name + ".State", origState, state);
+        }
+
+        #endregion
+
+        #region Creation
+
+        // for backward compatibility only!
+        public static YolManager Initialize(string statePath, string login)
+        {
+            var manager = Create(login);
+            manager._statePath = statePath;
+            return manager;
+        }
+
+        /// <summary>
+        /// Creates and registers an instance of the <see cref="YolManager"/> class with a name and a user login.
+        /// </summary>
+        /// <param name="name">The name of the manager.</param>
+        /// <param name="login">The login of the user to impersonate while running the state machine.</param>
+        /// <returns>The instance of the <see cref="YolManager"/> class.</returns>
+        /// <exception cref="ArgumentException"><paramref name="name"/> and/or <paramref name="login"/> is <c>null</c> or empty.</exception>
+        /// <exception cref="InvalidOperationException">A manager with that name has already been initialized.</exception>
+        public static YolManager Create(string name, string login)
+        {
+            lock (Managers)
+            {
+                if (Managers.ContainsKey(name))
+                    throw new InvalidOperationException(string.Format("A manager named \"{0}\" has already been initialized.", name));
+                return Managers[name] = new YolManager(name, login);
             }
         }
+
+        /// <summary>
+        /// Creates and registers an instance of the <see cref="YolManager"/> class with a name.
+        /// </summary>
+        /// <param name="name">The name of the manager.</param>
+        /// <returns>The instance of the <see cref="YolManager"/> class.</returns>
+        /// <remarks>The login will come from appSettings with key "Zbu.Yol.Manager.{name}.Login".</remarks>
+        /// <exception cref="ArgumentException"><paramref name="name"/> is <c>null</c> or empty.</exception>
+        /// <exception cref="InvalidOperationException">A manager with that name has already been initialized.</exception>
+        /// <exception cref="InvalidOperationException">No proper login was found in appSettings.</exception>
+        public static YolManager Create(string name)
+        {
+            var login = ConfigurationManager.AppSettings["Zbu.Yol.Manager." + name + ".Login"];
+            if (string.IsNullOrWhiteSpace(login))
+                throw new InvalidOperationException(string.Format("No login found in appSettings for name \"{0}\".", name));
+            return Create(name, login);
+        }
+
+        /// <summary>
+        /// Creates and registers the default instance of the <see cref="YolManager"/> class with a login.
+        /// </summary>
+        /// <param name="login">The login of the user to impersonate while running the state machine.</param>
+        /// <returns>The default instance of the <see cref="YolManager"/> class.</returns>
+        /// <exception cref="ArgumentException"><paramref name="login"/> is <c>null</c> or empty.</exception>
+        /// <exception cref="InvalidOperationException">The default manager has already been initialized.</exception>
+        public static YolManager CreateDefault(string login)
+        {
+            return Create("Default", login);
+        }
+
+        /// <summary>
+        /// Creates and registers the default instance of the <see cref="YolManager"/>.
+        /// </summary>
+        /// <returns>The default instance of the <see cref="YolManager"/> class.</returns>
+        /// <remarks>The login will come from appSettings with key "Zbu.Yol.Manager.Default.Login".</remarks>
+        /// <exception cref="InvalidOperationException">The default manager has already been initialized.</exception>
+        /// <exception cref="InvalidOperationException">No proper login was found in appSettings.</exception>
+        public static YolManager CreateDefault()
+        {
+            return Create("Default");
+        }
+
+        #endregion
+
+        #region Transitions
 
         /// <summary>
         /// Defines a transition.
@@ -117,7 +181,8 @@ namespace Zbu.Yol
                     sourceState));
 
             // register the transition
-            _transitions[sourceState] = new YolTransition{
+            _transitions[sourceState] = new YolTransition
+            {
                 SourceState = sourceState,
                 TargetState = targetState,
                 Execute = transition
@@ -131,78 +196,6 @@ namespace Zbu.Yol
                 _transitions.Add(targetState, null);
 
             return this;
-        }
-
-        /// <summary>
-        /// Initializes the current static unique instance of the <see cref="YolManager"/> class with a state file path and a user login.
-        /// </summary>
-        /// <param name="statePath">The full path of the file containing the state.</param>
-        /// <param name="login">The login of the user to impersonate while running the state machine.</param>
-        /// <returns>The current static unique instance of the <see cref="YolManager"/> class.</returns>
-        /// <exception cref="ArgumentException"><paramref name="statePath"/> and/or <paramref name="login"/> is <c>null</c> or empty.</exception>
-        /// <exception cref="InvalidOperationException">The current static unique instance has already been initialized.</exception>
-        public static YolManager Initialize(string statePath, string login)
-        {
-            if (_current != null)
-                throw new InvalidOperationException("Manager has already been initialized.");
-            return _current = new YolManager(statePath, login);
-        }
-
-        internal static void ExecuteInitialized(UmbracoApplicationBase umbracoApplication, ApplicationContext applicationContext)
-        {
-            if (_current != null)
-                _current.Execute(umbracoApplication, applicationContext);
-        }
-
-        internal void Execute(UmbracoApplicationBase umbracoApplication, ApplicationContext applicationContext)
-        {
-            if (umbracoApplication == null)
-                throw new ArgumentNullException("umbracoApplication");
-            if (applicationContext == null)
-                throw new ArgumentNullException("applicationContext");
-
-            ValidateTransitions();
-
-            // impersonate and run - in a using() block to ensure we terminate properly impersonation,
-            // whatever happens when executing transitions.
-            using (Security.Impersonate(umbracoApplication, applicationContext, _login))
-            {
-                ExecuteInternal();
-            }
-        }
-
-        // internal for tests
-        // beware, that one does not test for graph inconsistencies, should be done beforehand
-        // beware, that one does not validate parameters, should be done beforehand
-        internal void ExecuteInternal()
-        {
-            LogHelper.Info<YolManager>("Starting...");
-            var origState = GetState();
-            // ReSharper disable once AccessToModifiedClosure
-            LogHelper.Info<YolManager>("At {0}.", () => origState);
-
-            YolTransition transition;
-            if (!_transitions.TryGetValue(origState, out transition))
-                throw new Exception(string.Format("Unknown state \"{0}\".",
-                    origState));
-
-            while (transition != null)
-            {
-                if (!transition.Execute())
-                    throw new Exception("Transition failed.");
-
-                var nextState = transition.TargetState;
-                SaveState(origState, nextState);
-                origState = nextState;
-
-                // ReSharper disable once AccessToModifiedClosure
-                LogHelper.Info<YolManager>("At {0}.", () => origState);
-
-                if (!_transitions.TryGetValue(origState, out transition))
-                    throw new Exception(string.Format("Unknown state \"{0}\".",
-                        origState));
-            }
-            LogHelper.Info<YolManager>("Done.");
         }
 
         // internal for tests
@@ -239,5 +232,90 @@ namespace Zbu.Yol
                 verified.AddRange(visited);
             }
         }
+
+        #endregion
+
+        #region Execute
+
+        internal static void ExecuteInitialized(UmbracoApplicationBase umbracoApplication, ApplicationContext applicationContext)
+        {
+            lock (Managers)
+            {
+                foreach (var manager in Managers.Values)
+                    manager.Execute(umbracoApplication, applicationContext);
+            }
+        }
+
+        internal void Execute(UmbracoApplicationBase umbracoApplication, ApplicationContext applicationContext)
+        {
+            if (umbracoApplication == null)
+                throw new ArgumentNullException("umbracoApplication");
+            if (applicationContext == null)
+                throw new ArgumentNullException("applicationContext");
+
+            // temp for compat
+            if (!_nodb)
+            {
+                var state = ZbuKeyValueStore.GetValue("Zbu.Yol.Manager." + _name + ".State");
+                if (string.IsNullOrWhiteSpace(state) || !string.IsNullOrWhiteSpace(_statePath))
+                {
+                    try
+                    {
+                        state = File.ReadAllText(umbracoApplication.Server.MapPath(_statePath));
+                    }
+                    catch (Exception)
+                    {
+                        state = null;
+                    }
+                    if (!string.IsNullOrWhiteSpace(state))
+                        ZbuKeyValueStore.SetValue("Zbu.Yol.Manager." + _name + ".State", state);
+                }
+            }
+
+            ValidateTransitions();
+
+            // impersonate and run - in a using() block to ensure we terminate properly impersonation,
+            // whatever happens when executing transitions.
+            using (Security.Impersonate(umbracoApplication, applicationContext, _login))
+            {
+                ExecuteInternal();
+            }
+        }
+
+        // internal for tests
+        // beware, that one does not test for graph inconsistencies, should be done beforehand
+        // beware, that one does not validate parameters, should be done beforehand
+        internal void ExecuteInternal()
+        {
+            LogHelper.Info<YolManager>("Starting \"{0}\"...", () => _name);
+            var origState = GetState();
+            // ReSharper disable once AccessToModifiedClosure
+            LogHelper.Info<YolManager>("At {0}.", () => origState);
+
+            YolTransition transition;
+            if (!_transitions.TryGetValue(origState, out transition))
+                throw new Exception(string.Format("Unknown state \"{0}\".",
+                    origState));
+
+            while (transition != null)
+            {
+                if (!transition.Execute())
+                    throw new Exception("Transition failed.");
+
+                var nextState = transition.TargetState;
+                SaveState(origState, nextState);
+                origState = nextState;
+
+                // ReSharper disable once AccessToModifiedClosure
+                LogHelper.Info<YolManager>("At {0}.", () => origState);
+
+                if (!_transitions.TryGetValue(origState, out transition))
+                    throw new Exception(string.Format("Unknown state \"{0}\".",
+                        origState));
+            }
+            LogHelper.Info<YolManager>("Done.");
+        }
+
+        #endregion
     }
 }

@@ -1,8 +1,6 @@
 ﻿using System.Reflection;
-using System.Web;
 using Umbraco.Core;
 using Umbraco.Core.Models;
-using Umbraco.Web;
 
 namespace Zbu.Yol.Tests
 {
@@ -12,13 +10,8 @@ namespace Zbu.Yol.Tests
         {
             base.ApplicationStarted(umbracoApplication, applicationContext);
 
-            // full path name of the file that will contain the state
-            var statePath = umbracoApplication.Server.MapPath("~/App_Data/Zbu.Deploy.State");
-
-            // user that will execute the transitions, has to be a real user
-            const string impersonate = "jdemo";
-
-            YolManager.Initialize(statePath, impersonate)
+            // use the default manager, and get login from config
+            YolManager.CreateDefault()
                 .DefineTransition(string.Empty, "ae59d4", DoSomething)
                 ;
         }
@@ -26,7 +19,6 @@ namespace Zbu.Yol.Tests
         private static bool DoSomething()
         {
             var svcs = ApplicationContext.Current.Services;
-            var server = UmbracoContext.Current.HttpContext.Server;
 
             var template = new Template("~/Views/SampleTemplate1.cshtml", "Sample Template 1", "SampleTemplate1")
             {
