@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Linq;
+using System.Web;
 using System.Security.Principal;
 using System.Threading;
 using System.Web.Security;
 using Umbraco.Core;
+using Umbraco.Core.Configuration;
 using Umbraco.Core.Security;
+using Umbraco.Web;
 
 namespace Zbu.Yol
 {
@@ -13,13 +16,65 @@ namespace Zbu.Yol
     /// </summary>
     internal class Security : IDisposable
     {
-        private UmbracoApplicationBase _app;
-        private IPrincipal _user;
+        private HttpCookie _cookie;
+        private HttpContextBase _context;
         private bool _disposed;
 
+        static readonly string CookieName = UmbracoConfig.For.UmbracoSettings().Security.AuthCookieName;
+
         // the only way to retrieve Security is through Impersonate
-        private Security()
-        { }
+        private Security(HttpApplication application, ApplicationContext applicationContext, string login)
+        {
+            _context = new HttpContextWrapper(application.Context);
+            BeginImpersonate(applicationContext, login);
+        }
+
+        private void BeginImpersonate(ApplicationContext applicationContext, string login)
+        {
+            // save current cookie (if any)
+            _cookie = _context.Request.Cookies[CookieName];
+
+            // ensure login corresponds to an existing user
+            var user = applicationContext.Services.UserService.GetByUsername(login);
+            if (user == null)
+                throw new ArgumentException(string.Format("Invalid logon: \"{0}\".", login));
+
+            // log the user in
+            UmbracoContext.Current.Security.PerformLogin(user);
+
+            // and re-authenticate
+            ReAuthenticate();
+        }
+
+        private void EndImpersonate()
+        {
+            // put the original cookie back in place
+            if (_cookie == null)
+                _context.Response.Cookies.Remove(CookieName);
+            else
+                _context.Response.Cookies.Set(_cookie);
+
+            // and re-authenticate
+            ReAuthenticate();
+        }
+
+        private void ReAuthenticate()
+        {
+            // copy cookie over from response to request - no idea why it is not automatic
+            var cookie = _context.Response.Cookies[CookieName];
+            if (cookie == null)
+                _context.Request.Cookies.Remove(CookieName);
+            else
+                _context.Request.Cookies.Set(cookie);
+
+            // clear UmbracoBackOfficeIdentity internal cache - should be done in Umbraco
+            _context.Items.Remove(typeof(UmbracoBackOfficeIdentity));
+
+            // authenticate
+            if (cookie == null) return;
+            var ticket = FormsAuthentication.Decrypt(cookie.Value);
+            _context.AuthenticateCurrentRequest(ticket, false);
+        }
 
         /// <summary>
         /// Impersonates an Umbraco user.
@@ -40,75 +95,7 @@ namespace Zbu.Yol
             if (string.IsNullOrWhiteSpace(login))
                 throw new ArgumentException("Cannot be null nor empty.", "login");
 
-            var security = new Security
-            {
-                _app = app,
-                _user = app.Context.User
-            };
-
-            var deployUser = context.Services.UserService.GetByUsername(login);
-            if (deployUser == null)
-                throw new ArgumentException(string.Format("Invalid logon: \"{0}\".", login));
-
-            // this is ugly, because it is all internal in Umbraco
-            // but it works (against 7.1.1)
-            // if we don't do it then publishing fails (notification wants a user of some sort...)
-
-            // dunno really if we should fix it so that we don't need to impersonate, or
-            // if we should make impersonation much easier so a specific user can be used
-            // for running transitions...
-
-            // see: WebSecurity.PerformLogin
-            var userDataType = typeof(IBootManager).Assembly.GetType("Umbraco.Core.Security.UserData");
-            var userData = Activator.CreateInstance(userDataType);
-            var props = userDataType.GetProperties();
-            var name = Umbraco.Core.Configuration.UmbracoVersion.Current.Major >= 7 ? "SessionId" : "UserContextId";
-            props.Single(x => x.Name == name).SetValue(userData, Guid.NewGuid().ToString("N"));
-            props.Single(x => x.Name == "Id").SetValue(userData, deployUser.Id);
-            props.Single(x => x.Name == "AllowedApplications").SetValue(userData, deployUser.AllowedSections.ToArray());
-            props.Single(x => x.Name == "RealName").SetValue(userData, deployUser.Name);
-            props.Single(x => x.Name == "Roles").SetValue(userData, new[] { deployUser.UserType.Alias });
-            props.Single(x => x.Name == "StartContentNode").SetValue(userData, deployUser.StartContentId);
-            props.Single(x => x.Name == "StartMediaNode").SetValue(userData, deployUser.StartMediaId);
-            props.Single(x => x.Name == "Username").SetValue(userData, deployUser.Username);
-            props.Single(x => x.Name == "Culture").SetValue(userData, Culture(deployUser.Language));
-
-            // then we don't need userData in the ticket
-            // see: UmbracoBackOfficeIdentity.EnsureDeserialized
-            app.Context.Items[typeof(UmbracoBackOfficeIdentity)] = userData;
-
-            // see: AuthenticationExtensions.CreateAuthTicketAndCookie
-            var ticket = new FormsAuthenticationTicket(
-                4,
-                deployUser.Name,
-                DateTime.Now,
-                DateTime.Now.AddMinutes(30),
-                false,
-                "", //userData,
-                "/"
-                );
-
-            // see: AuthenticationExtensions.AuthenticateCurrentRequest
-            var identity = new UmbracoBackOfficeIdentity(ticket);
-            var tempUser = new GenericPrincipal(identity, identity.Roles);
-            app.Context.User = tempUser;
-            Thread.CurrentPrincipal = tempUser;
-
-            return security;
-        }
-
-        // copied over from umbraco.ui because it's internal there ;-(
-        private static string Culture(string userLanguage)
-        {
-            var langFile = global::umbraco.ui.getLanguageFile(userLanguage);
-            try
-            {
-                return langFile.SelectSingleNode("/language").Attributes.GetNamedItem("culture").Value;
-            }
-            catch
-            {
-                return string.Empty;
-            }
+            return new Security(app, context, login);
         }
 
         public void Dispose()
@@ -118,13 +105,10 @@ namespace Zbu.Yol
 
         private void Dispose(bool disposing)
         {
-            if (disposing && !_disposed)
-            {
-                // see: AuthenticationExtensions.AuthenticateCurrentRequest
-                _app.Context.User = _user;
-                Thread.CurrentPrincipal = _user;
-                _disposed = true;
-            }
+            if (!disposing || _disposed) return;
+
+            EndImpersonate();
+            _disposed = true;
         }
     }
 }
