@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Configuration;
 using System.IO;
 using System.Linq;
+using System.Web;
 using System.Web.Hosting;
 using Umbraco.Core;
 using Umbraco.Core.Logging;
@@ -64,7 +65,8 @@ namespace Zbu.Yol
 
         private string GetState()
         {
-            return _nodb ? State : ZbuKeyValueStore.GetValue("Zbu.Yol.Manager." + _name + ".State");
+            var state = _nodb ? State : ZbuKeyValueStore.GetValue("Zbu.Yol.Manager." + _name + ".State");
+            return state ?? string.Empty;
         }
 
         private void SaveState(string origState, string state)
@@ -82,7 +84,7 @@ namespace Zbu.Yol
         // for backward compatibility only!
         public static YolManager Initialize(string statePath, string login)
         {
-            var manager = Create(login);
+            var manager = CreateDefault(login);
             manager._statePath = statePath;
             return manager;
         }
@@ -237,7 +239,7 @@ namespace Zbu.Yol
 
         #region Execute
 
-        internal static void ExecuteInitialized(UmbracoApplicationBase umbracoApplication, ApplicationContext applicationContext)
+        internal static void ExecuteInitialized(HttpApplication umbracoApplication, ApplicationContext applicationContext)
         {
             lock (Managers)
             {
@@ -246,7 +248,7 @@ namespace Zbu.Yol
             }
         }
 
-        internal void Execute(UmbracoApplicationBase umbracoApplication, ApplicationContext applicationContext)
+        internal void Execute(HttpApplication umbracoApplication, ApplicationContext applicationContext)
         {
             if (umbracoApplication == null)
                 throw new ArgumentNullException("umbracoApplication");
@@ -261,14 +263,17 @@ namespace Zbu.Yol
                 {
                     try
                     {
-                        state = File.ReadAllText(umbracoApplication.Server.MapPath(_statePath));
+                        state = File.ReadAllText(_statePath);
                     }
                     catch (Exception)
                     {
                         state = null;
                     }
                     if (!string.IsNullOrWhiteSpace(state))
+                    {
+                        LogHelper.Info<YolManager>("Copying state from file to database.");
                         ZbuKeyValueStore.SetValue("Zbu.Yol.Manager." + _name + ".State", state);
+                    }
                 }
             }
 
@@ -289,8 +294,9 @@ namespace Zbu.Yol
         {
             LogHelper.Info<YolManager>("Starting \"{0}\"...", () => _name);
             var origState = GetState();
-            // ReSharper disable once AccessToModifiedClosure
-            LogHelper.Info<YolManager>("At {0}.", () => origState);
+            var info = "At " + (string.IsNullOrWhiteSpace(origState) ? "origin" : ("\"" + origState + "\"")) + ".";
+            info = info.Replace("{", "{{").Replace("}", "}}"); // stupid LogHelper
+            LogHelper.Info<YolManager>(info);
 
             YolTransition transition;
             if (!_transitions.TryGetValue(origState, out transition))
