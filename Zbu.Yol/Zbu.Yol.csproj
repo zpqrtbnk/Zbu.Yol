@@ -67,6 +67,7 @@
     <Compile Include="Security.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="YolManager.cs" />
+    <Compile Include="YolModule.cs" />
     <Compile Include="YolTransition.cs" />
     <Compile Include="ZbuKeyValueStore.cs" />
   </ItemGroup>
