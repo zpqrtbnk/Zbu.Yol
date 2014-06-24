@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Umbraco.Core;
+using Umbraco.Core.Logging;
 using Umbraco.Core.Persistence;
 using Umbraco.Core.Persistence.DatabaseAnnotations;
 
@@ -35,6 +36,9 @@ namespace Zbu.Yol
         {
             var db = ApplicationContext.Current.DatabaseContext.Database;
 
+            if (key.Length > 128)
+                throw new ArgumentException("Key cannot be longer than 512 chars.");
+
             IDbTransaction trx = null;
             try
             {
@@ -42,6 +46,7 @@ namespace Zbu.Yol
                 // we want RepeatableRead so that noone can change the value while we're verifying it
                 // so we're entirely bypassing Umbraco's transaction management which prob. is a bad thing
                 //db.BeginTransaction();
+                db.OpenSharedConnection();
                 trx = db.Connection.BeginTransaction(IsolationLevel.RepeatableRead);
 
                 var kv = db.SingleOrDefault<ZbuKeyValue>("SELECT * FROM ZbuKeyValue WHERE KVKey=@0", key);
@@ -64,6 +69,7 @@ namespace Zbu.Yol
                 //db.AbortTransaction();
                 if (trx != null)
                     trx.Rollback();
+                db.CloseSharedConnection();
                 throw;
             }
         }
@@ -74,20 +80,25 @@ namespace Zbu.Yol
 
             // create if not exists
             if (!db.TableExist("ZbuKeyValue"))
-                db.CreateTable<ZbuKeyValue>(false);            
+            {
+                LogHelper.Info<ZbuKeyValueStore>("Create ZbuKeyValue database table.");
+                db.CreateTable<ZbuKeyValue>(false);
+            }
         }
 
         [TableName("ZbuKeyValue")]
-        [PrimaryKey("KVKey")]
+        [PrimaryKey("KVKey", autoIncrement = false)]
         [ExplicitColumns]
         public class ZbuKeyValue
         {
             [Column("KVKey")]
-            [PrimaryKeyColumn]
+            [PrimaryKeyColumn(AutoIncrement = false, Clustered = true)]
+            [Length(128)]
             public string Key { get; set; }
 
             [Column("KVValue")]
             [SpecialDbType(SpecialDbTypes.NTEXT)]
+            [NullSetting(NullSetting = NullSettings.Null)]
             public string Value { get; set; }
         }
     }
