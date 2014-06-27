@@ -12,10 +12,8 @@ the site to its latest state. A transition is a function that can do about anyth
 content types, etc. but there is no limitation to what it can do.
 
 #### Compatibility
-It is known to run on top of Umbraco version 7.1.2. It has *not* been tested on other 7.x versions,
-and does not seem to build on top of Umbraco version 6.x at the moment, due to a class being internal.
-To run on top of 7.x we *already* use internal classes through Reflection (sigh...) but rather than also
-do it for 6.x I'd like to figure out whether those internal classes could not be made public.
+It is known to run on top of Umbraco version 7.1.4. It has *not* been tested on other 7.x versions,
+it *can* build on top of 6.2.1 but it's dirty.
 
 In order to build, you will need to copy the following DLLs from the Umbraco project into the `lib`
 directory: `businesslogic.dll`, `cms.dll`, `interfaces.dll`, `log4net.dll`, `UmbracoCore.dll` and `umbraco.dll`.
@@ -38,6 +36,11 @@ be safe, but I might have missed something obvious and there might be a huge sec
 
 #### How does it work
 This is how you install the manager in your application:
+
+***Note***: *this needs to be updated*. *Latest version stores state in database and will copy state
+over to database if using the syntax below, then ignore the file. Also the impersonating user should
+now be specified in an appSetting (with key "Zbu.Yol.Manager.Default.Login"). Also it is now possible
+to run non-default managers.* **TO BE DOCUMENTED**
 
 ```c#
 public class ConfigureYolManager : ApplicationEventHandler
