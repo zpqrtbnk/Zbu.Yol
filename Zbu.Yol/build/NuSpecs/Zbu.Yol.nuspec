@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
+	<metadata minClientVersion="2.8.1">
+		<id>Zbu.Yol</id>
+		<version>$version$</version>
+		<title>ZpqrtBnk Umbraco Deployment Utility</title>
+		<authors>Pilotine - ZpqrtBnk</authors>
+		<owners>Pilotine - ZpqrtBnk</owners>
+		<requireLicenseAcceptance>false</requireLicenseAcceptance>
+		<description>ZpqrtBnk Umbraco Deployment Utility.</description>
+		<copyright>Copyright © Pilotine - ZpqrtBnk 2013-2014</copyright>
+		<dependencies />
+	</metadata>
+	<files>
+    <!-- our dlls -->
+    <file src="..\..\bin\Release\Zbu.Yol.dll" target="lib\Zbu.Yol.dll" />
+
+    <!-- content // we don't have any -->
+		
+    <!-- post-install script // we don't have one -->
+    <!--
+		<file src="tools\install.ps1" target="tools\install.ps1" />
+		-->
+    
+    <!-- transforms // we don't have any -->
+
+  </files>
+</package>

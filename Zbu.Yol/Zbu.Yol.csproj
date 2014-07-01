@@ -2,6 +2,11 @@
 <Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
+    <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
+    <MSBuildUmbracoTasksPath>$(SolutionDir)\lib</MSBuildUmbracoTasksPath>
+    <RestorePackages>true</RestorePackages>
+  </PropertyGroup>
+  <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{E557BF5A-4231-44CF-A16C-637E69C66482}</ProjectGuid>
@@ -61,7 +66,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Properties\CommonInfos.cs" />
+    <Compile Include="Properties\CommonInfo.cs" />
     <Compile Include="YolApplication.cs" />
     <Compile Include="AssemblyExtensions.cs" />
     <Compile Include="Security.cs" />
@@ -72,11 +77,43 @@
     <Compile Include="ZbuKeyValueStore.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">
   </Target>
-  <Target Name="AfterBuild">
-  </Target>
   -->
+  <Target Name="AfterBuild" DependsOnTargets="NuGetPackage">
+  </Target>
+  <Target Name="NuGetPackage">
+    <!-- get the assembly version -->
+    <GetAssemblyIdentity AssemblyFiles="$(OutputPath)Zbu.Yol.dll">
+      <Output TaskParameter="Assemblies" ItemName="AssemblyInfos" />
+    </GetAssemblyIdentity>
+    <!-- dunno how to get the assembly informational version -->
+    <ReadLinesFromFile File="$(SolutionDir)Zbu.Yol\Properties\CommonInfo.cs">
+      <Output TaskParameter="Lines" ItemName="CommonInfosLines" />
+    </ReadLinesFromFile>
+    <PropertyGroup>
+      <Pattern>(?&lt;=\[assembly: AssemblyInformationalVersion\(").*(?="\)\])</Pattern>
+      <In>@(CommonInfosLines)</In>
+      <PackageVersion>$([System.Text.RegularExpressions.Regex]::Match($(In), $(Pattern)))</PackageVersion>
+    </PropertyGroup>
+    <!-- remove existing packages -->
+    <Message Importance="High" Text="Packaging version %(AssemblyInfos.Version) into NuGet package $(PackageVersion)" />
+    <ItemGroup>
+      <NuGetFilesToDelete Include="$(ProjectDir)build\Packages\*.nupkg" />
+    </ItemGroup>
+    <Delete Files="@(NuGetFilesToDelete)" />
+    <!-- then pack and copy package -->
+    <PropertyGroup>
+      <!-- -symbols -->
+      <NuGetBuildCommand>$(NuGetCommand) pack "$(ProjectDir)build\NuSpecs\Zbu.Yol.nuspec" -Version "$(PackageVersion)" -Properties "Configuration=$(Configuration);Platform=$(Platform)" $(NonInteractiveSwitch) -OutputDirectory "$(ProjectDir)build\Packages"</NuGetBuildCommand>
+    </PropertyGroup>
+    <Exec Command="$(NuGetBuildCommand)" LogStandardErrorAsError="true" />
+    <ItemGroup>
+      <NuGetFilesToCopy Include="$(ProjectDir)build\Packages\*.nupkg" />
+    </ItemGroup>
+    <Copy SourceFiles="@(NuGetFilesToCopy)" DestinationFolder="$(SolutionDir)build\$(Configuration)" />
+  </Target>
 </Project>
