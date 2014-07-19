@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using Umbraco.Core;
@@ -40,6 +41,11 @@ namespace Zbu.Yol
                 throw new ArgumentException("Key cannot be longer than 512 chars.");
 
             IDbTransaction trx = null;
+
+            // This is just because Umbraco database is IsolationLevel agnostic ;-(
+            var trxField = typeof(Database).GetField("_transaction", BindingFlags.Instance|BindingFlags.NonPublic);
+            if (trxField == null) throw new Exception("Failed to get db._transaction field.");
+            
             try
             {
                 // BeginTransaction does a simple IDbTransaction.BeginTransaction() with default isolation level
@@ -48,6 +54,7 @@ namespace Zbu.Yol
                 //db.BeginTransaction();
                 db.OpenSharedConnection();
                 trx = db.Connection.BeginTransaction(IsolationLevel.RepeatableRead);
+                trxField.SetValue(db, trx);
 
                 var kv = db.SingleOrDefault<ZbuKeyValue>("SELECT * FROM ZbuKeyValue WHERE KVKey=@0", key);
                 var ok = !checkExpected || (string.IsNullOrWhiteSpace(expected)
@@ -63,12 +70,19 @@ namespace Zbu.Yol
                 
                 //db.CompleteTransaction();
                 trx.Commit();
+                trx.Dispose();
+                trxField.SetValue(db, null);
+                db.CloseSharedConnection();
             }
             catch
             {
                 //db.AbortTransaction();
                 if (trx != null)
+                {
                     trx.Rollback();
+                    trx.Dispose();
+                    trxField.SetValue(db, null);
+                }
                 db.CloseSharedConnection();
                 throw;
             }
