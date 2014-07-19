@@ -1,0 +1,20 @@
+BUILD
+-----
+
+Configurations "Debug-U6" and "Release-U6" are for Umbraco v6.
+  Both define compile constant UMBRACO_6
+  Which is used in Zbu.Yol.Security
+
+Umbraco dependencies
+  The following libs must be in lib/umbraco:
+    businesslogic.dll
+	cms.dll
+	interfaces.dll
+	log4net.dll
+	Umbraco.Core.dll
+	umbraco.dll
+
+  In order to build for v6 the same libs must be in lib/umbraco-v6
+  These are conditional references in csproj files
+
+Package (NuGet) is created for "Release" build only, in the build directory.

@@ -1,17 +1,18 @@
-﻿//#define UMBRACO_6
-
-using System;
-using System.Linq;
-using System.Reflection;
+﻿using System;
 using System.Web;
-using System.Security.Principal;
-using System.Threading;
 using System.Web.Security;
 using Umbraco.Core;
-using Umbraco.Core.Configuration;
 using Umbraco.Core.Logging;
 using Umbraco.Core.Security;
 using Umbraco.Web;
+#if UMBRACO_6
+using System.Reflection;
+using System.Threading;
+using System.Security.Principal;
+#else
+using System.Linq;
+using Umbraco.Core.Configuration;
+#endif
 
 namespace Zbu.Yol
 {
@@ -23,6 +24,10 @@ namespace Zbu.Yol
         private HttpCookie _cookie;
         private readonly HttpContextBase _context;
         private bool _disposed;
+#if UMBRACO_6
+        private readonly UmbracoApplicationBase _app;
+        private readonly IPrincipal _user;
+#endif
 
 #if UMBRACO_6
         private static string GetCookieName()
@@ -39,6 +44,12 @@ namespace Zbu.Yol
         // the only way to retrieve Security is through Impersonate
         private Security(HttpApplication application, ApplicationContext applicationContext, string login)
         {
+#if UMBRACO_6
+            _app = application as UmbracoApplicationBase;
+            if (_app == null)
+                throw new ArgumentException("Not an UmbracoApplicationBase.", "application");
+            _user = _app.Context.User;
+#endif
             _context = new HttpContextWrapper(application.Context);
             BeginImpersonate(applicationContext, login);
         }
@@ -46,6 +57,7 @@ namespace Zbu.Yol
         private void BeginImpersonate(ApplicationContext applicationContext, string login)
         {
             // save current cookie (if any)
+            // request cookie collection returns null when missing
             _cookie = _context.Request.Cookies[CookieName];
 
             // ensure login corresponds to an existing user
@@ -86,15 +98,17 @@ namespace Zbu.Yol
         {
             LogHelper.Info<Security>("Restoring current user.");
 
-#if UMBRACO_6
-            // wtf shall we do?!
-#else
             // put the original cookie back in place
+            // note: after Remove the cookie is actually removed from both Response & Request
             if (_cookie == null)
                 _context.Response.Cookies.Remove(CookieName);
             else
                 _context.Response.Cookies.Set(_cookie);
 
+#if UMBRACO_6
+            _app.Context.User = _user;
+            Thread.CurrentPrincipal = _user;
+#else
             // and re-authenticate
             ReAuthenticate();
 #endif
@@ -103,12 +117,10 @@ namespace Zbu.Yol
 #if !UMBRACO_6
         private void ReAuthenticate()
         {
-            // copy cookie over from response to request - no idea why it is not automatic
-            var cookie = _context.Response.Cookies[CookieName];
-            if (cookie == null)
-                _context.Request.Cookies.Remove(CookieName);
-            else
-                _context.Request.Cookies.Set(cookie);
+            // response cookie collection CREATES a cookie when asked for it!
+            var cookie = _context.Response.Cookies.AllKeys.Contains(CookieName)
+                ? _context.Response.Cookies[CookieName]
+                : null;
 
             // clear UmbracoBackOfficeIdentity internal cache - should be done in Umbraco
             _context.Items.Remove(typeof(UmbracoBackOfficeIdentity));
@@ -117,24 +129,6 @@ namespace Zbu.Yol
             if (cookie == null) return;
             var ticket = FormsAuthentication.Decrypt(cookie.Value);
             _context.AuthenticateCurrentRequest(ticket, false);
-        }
-#endif
-
-#if UMBRACO_6
-        // this is ugly - but I do *not* want to support v6 - only I have to for one stupid project of mine
-        private static void AuthenticateCurrentRequest(HttpContextBase context)
-        {
-            var type1 = typeof (Umbraco.Core.Constants).Assembly.GetType("AuthenticationExtensions");
-            var meth1 = type1.GetMethod("GetAuthTicket", BindingFlags.Static | BindingFlags.NonPublic);
-            var ticket = meth1.Invoke(null, new object[] {context, CookieName}) as FormsAuthenticationTicket;
-
-            var type2 = typeof (Umbraco.Core.Constants).Assembly.GetType("FormsAuthenticationTicketExtensions");
-            var meth2 = type2.GetMethod("CreateUmbracoIdentity", BindingFlags.Static | BindingFlags.NonPublic);
-            var identity = meth2.Invoke(null, new object[] { ticket }) as UmbracoBackOfficeIdentity;
-
-            Thread.CurrentThread.CurrentCulture =
-                Thread.CurrentThread.CurrentUICulture =
-                new System.Globalization.CultureInfo(identity.Culture);
         }
 #endif
 

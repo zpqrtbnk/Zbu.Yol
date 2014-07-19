@@ -34,18 +34,60 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug-U6|AnyCPU'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\Debug-U6\</OutputPath>
+    <DefineConstants>TRACE;DEBUG;UMBRACO_6</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release-U6|AnyCPU'">
+    <OutputPath>bin\Release-U6\</OutputPath>
+    <DefineConstants>TRACE;UMBRACO_6</DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
   <ItemGroup>
-    <Reference Include="businesslogic">
-      <HintPath>..\lib\businesslogic.dll</HintPath>
+    <Reference Include="businesslogic" Condition=" '$(Configuration)' == 'Release' or '$(Configuration)' == 'Debug' ">
+      <HintPath>..\lib\umbraco\businesslogic.dll</HintPath>
     </Reference>
-    <Reference Include="cms">
-      <HintPath>..\lib\cms.dll</HintPath>
+    <Reference Include="cms" Condition=" '$(Configuration)' == 'Release' or '$(Configuration)' == 'Debug' ">
+      <HintPath>..\lib\umbraco\cms.dll</HintPath>
     </Reference>
-    <Reference Include="interfaces">
-      <HintPath>..\lib\interfaces.dll</HintPath>
+    <Reference Include="interfaces" Condition=" '$(Configuration)' == 'Release' or '$(Configuration)' == 'Debug' ">
+      <HintPath>..\lib\umbraco\interfaces.dll</HintPath>
     </Reference>
-    <Reference Include="log4net">
-      <HintPath>..\lib\log4net.dll</HintPath>
+    <Reference Include="umbraco" Condition=" '$(Configuration)' == 'Release' or '$(Configuration)' == 'Debug' ">
+      <HintPath>..\lib\umbraco\umbraco.dll</HintPath>
+    </Reference>
+    <Reference Include="Umbraco.Core" Condition=" '$(Configuration)' == 'Release' or '$(Configuration)' == 'Debug' ">
+      <HintPath>..\lib\umbraco\Umbraco.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="log4net" Condition=" '$(Configuration)' == 'Release' or '$(Configuration)' == 'Debug' ">
+      <HintPath>..\lib\umbraco\log4net.dll</HintPath>
+    </Reference>
+    <Reference Include="businesslogic" Condition=" '$(Configuration)' == 'Release-U6' or '$(Configuration)' == 'Debug-U6' ">
+      <HintPath>..\lib\umbraco-6\businesslogic.dll</HintPath>
+    </Reference>
+    <Reference Include="cms" Condition=" '$(Configuration)' == 'Release-U6' or '$(Configuration)' == 'Debug-U6' ">
+      <HintPath>..\lib\umbraco-6\cms.dll</HintPath>
+    </Reference>
+    <Reference Include="interfaces" Condition=" '$(Configuration)' == 'Release-U6' or '$(Configuration)' == 'Debug-U6' ">
+      <HintPath>..\lib\umbraco-6\interfaces.dll</HintPath>
+    </Reference>
+    <Reference Include="umbraco" Condition=" '$(Configuration)' == 'Release-U6' or '$(Configuration)' == 'Debug-U6' ">
+      <HintPath>..\lib\umbraco-6\umbraco.dll</HintPath>
+    </Reference>
+    <Reference Include="Umbraco.Core" Condition=" '$(Configuration)' == 'Release-U6' or '$(Configuration)' == 'Debug-U6' ">
+      <HintPath>..\lib\umbraco-6\Umbraco.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="log4net" Condition=" '$(Configuration)' == 'Release-U6' or '$(Configuration)' == 'Debug-U6' ">
+      <HintPath>..\lib\umbraco-6\log4net.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Configuration" />
@@ -58,12 +100,6 @@
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
-    <Reference Include="umbraco">
-      <HintPath>..\lib\umbraco.dll</HintPath>
-    </Reference>
-    <Reference Include="Umbraco.Core">
-      <HintPath>..\lib\Umbraco.Core.dll</HintPath>
-    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Properties\CommonInfo.cs" />
@@ -85,7 +121,7 @@
   -->
   <Target Name="AfterBuild" DependsOnTargets="NuGetPackage">
   </Target>
-  <Target Name="NuGetPackage">
+  <Target Name="NuGetPackage" Condition=" '$(Configuration)' == 'Release' ">
     <!-- get the assembly version -->
     <GetAssemblyIdentity AssemblyFiles="$(OutputPath)Zbu.Yol.dll">
       <Output TaskParameter="Assemblies" ItemName="AssemblyInfos" />
