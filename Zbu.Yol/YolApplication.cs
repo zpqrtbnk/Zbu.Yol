@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading;
+using System.Web;
 using Umbraco.Core;
 using Umbraco.Core.Logging;
 using Umbraco.Web;
@@ -38,12 +39,19 @@ namespace Zbu.Yol
             // we do not block the other requests while that one is running
             // and if the upgrade fails (throws)... have to restart the app
 
+            // if for any reason the context is null, maybe that's a client-side
+            // request (for an image, javascript, whatever) but anyway we cannot
+            // do anything and have to wait for a proper request.
+            if (UmbracoContext.Current == null)
+                return;
+
             // sets to 1 and return the previous value - run only if zero
             if (Interlocked.Exchange(ref _ran, 1) > 0) return;
 
             var app = UmbracoContext.Current.HttpContext.ApplicationInstance;
-            LogHelper.Info<YolApplication>("Run.");
+            LogHelper.Info<YolApplication>("Run (once).");
             YolManager.ExecuteInitialized(app, ApplicationContext.Current);
+            LogHelper.Info<YolApplication>("Done running (once).");
         }
     }
 }
