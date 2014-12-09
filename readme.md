@@ -11,6 +11,8 @@ transitions, and will make sure that available transitions run when Umbraco star
 the site to its latest state. A transition is a function that can do about anything, mostly setting up
 content types, etc. but there is no limitation to what it can do.
 
+See also: [uMigrations](https://github.com/Lucrasoft/uMigrations)
+
 #### Compatibility
 It is known to run on top of Umbraco version 7.1.4. It has *not* been tested on other 7.x versions,
 it *can* build on top of 6.2.1 but it's dirty.
